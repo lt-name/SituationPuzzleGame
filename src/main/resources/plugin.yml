@@ -1,0 +1,9 @@
+name: SituationPuzzleGame
+main: cn.lanink.situationpuzzlegame.SituationPuzzleGame
+version: "1.0.0"
+author: LT_Name
+api: ["1.0.0"]
+
+permissions:
+  situationpuzzlegame.use:
+    default: true

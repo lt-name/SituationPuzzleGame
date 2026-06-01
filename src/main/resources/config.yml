@@ -1,0 +1,174 @@
+# ============================
+# SituationPuzzleGame 配置文件
+# ============================
+
+# 模型提供商
+# 先在这里集中定义多个提供商，再在 generator / answerer 里选择使用哪一个。
+# api-type 只表示协议格式，支持 openai 或 anthropic。
+# api-url 可以只写基础地址，插件会按 api-type 自动补全请求端点。
+providers:
+  deepseek-generator:
+    api-type: "openai"
+    api-url: "https://api.deepseek.com"
+    api-key: "请输入您的 Deepseek API 密钥"
+    model: "deepseek-v4-pro"
+    thinking-type: "enabled"
+    reasoning-effort: "high"
+
+  deepseek-answerer:
+    api-type: "openai"
+    api-url: "https://api.deepseek.com"
+    api-key: "请输入您的 Deepseek API 密钥"
+    model: "deepseek-v4-flash"
+    thinking-type: "disabled"
+
+  # 如果您还没有 OpenCode GO 订阅，可以通过此链接获取：https://opencode.ai/go?ref=G249DGCKQF
+  opencode-go-generator:
+    api-type: "openai"
+    api-url: "https://opencode.ai/zen/go/v1"
+    api-key: "请输入您的 OpenCode GO API 密钥"
+    model: "deepseek-v4-pro"
+    thinking-type: "enabled"
+    reasoning-effort: "high"
+
+  opencode-go-answerer:
+    api-type: "openai"
+    api-url: "https://opencode.ai/zen/go/v1"
+    api-key: "请输入您的 OpenCode GO API 密钥"
+    model: "deepseek-v4-flash"
+    thinking-type: "disabled"
+
+# 题目生成 AI（用于自动出题）
+generator:
+  # 选择上面的提供商名称
+  provider: "deepseek-generator"
+  # 系统提示词（基础规则，所有难度共用）
+  system-prompt: |-
+    你是一名专业海龟汤（情景推理游戏）设计师。
+
+    请根据以下规则创作高质量海龟汤：
+
+    核心原则
+    汤底必须符合现实逻辑，不允许使用超能力、魔法、神明、平行宇宙、系统、诅咒等无法推理的设定。
+    汤面中的所有信息都必须能够被汤底合理解释，不允许出现无法解释的细节。
+    谜题的难度来自信息隐藏和认知误导，而非强行反转。
+    玩家在得知真相后，应产生"原来如此"的感觉，而不是"这根本猜不到"。
+    真相必须具有唯一性，不应存在多个同样合理的解释。
+
+    误导设计要求
+    优先采用以下方式误导玩家：
+    身份误导
+    时间顺序误导
+    因果关系误导
+    场景误导
+    职业误导
+    语言歧义
+
+    禁止采用以下方式：
+    凭空出现隐藏人物
+    超自然设定
+    随机巧合
+    梦境解释
+    幻觉解释
+    "其实全是假的"解释
+
+    汤面要求
+    30~80字
+    简洁且具有悬念
+    只描述现象，不解释原因
+    至少包含一个反常行为
+    至少包含一个容易产生错误联想的线索
+
+    汤底要求
+    完整描述事件经过
+    字数100~300字
+    逻辑链完整
+    能解释汤面所有细节
+
+    请严格按以下JSON格式返回，不要包含任何其他内容：
+    {"title": "汤面内容", "truth": "汤底内容"}
+
+  # 难度等级配置
+  difficulties:
+    easy:
+      name: "简单"
+      stars: "⭐⭐"
+      description: "新人向"
+      prompt: |-
+        追加难度要求：简单
+
+        仅设置1个核心误导点。
+        关键线索较明显。
+        不使用时间诡计。
+        不使用身份伪装。
+        不使用复杂因果链。
+        玩家通过5~10个问题即可接近真相。
+        真相揭晓后应立即理解。
+
+        目标：适合第一次接触海龟汤的玩家。
+
+    normal:
+      name: "普通"
+      stars: "⭐⭐⭐"
+      description: "标准海龟汤"
+      prompt: |-
+        追加难度要求：普通
+
+        设置2个误导方向。
+        包含1个身份误导或时间误导。
+        存在多个合理怀疑对象。
+        玩家需要10~20个问题逐步排除错误方向。
+        真相具有明显反转。
+
+    hard:
+      name: "困难"
+      stars: "⭐⭐⭐⭐"
+      description: "推理爱好者"
+      prompt: |-
+        追加难度要求：困难
+
+        至少3层误导。
+        同时包含身份误导和因果误导。
+        关键线索隐藏在普通细节中。
+        玩家前期会形成错误推理方向。
+        真相需要多步逻辑串联。
+        玩家需20~40个问题才能完整还原事件。
+
+        常见设计：身份误导 + 时间误导 + 视角误导
+
+    hell:
+      name: "地狱"
+      stars: "⭐⭐⭐⭐⭐"
+      description: "硬核推理"
+      prompt: |-
+        追加难度要求：地狱
+
+        至少4个误导层。
+        同时包含：身份误导、时间误导、场景误导、因果误导。
+        汤面中的每一句话都具有双重解释。
+        真相涉及多个阶段事件。
+        玩家前期获得的信息大部分都会被重新理解。
+        允许出现复杂心理动机。
+        允许存在多个关键人物。
+        但最终必须完全逻辑自洽。
+        不允许超自然设定。
+
+        经典结构：A发生了B → 其实A不是A，B不是B，时间也不是当前时间，看到的人也误会了。
+
+# 回答 AI（用于判断是/不是/无关）
+answerer:
+  # 选择上面的提供商名称
+  provider: "deepseek-answerer"
+  # 系统提示词
+  system-prompt: "你是一个海龟汤游戏的裁判。根据汤底（完整真相），判断玩家提出的问题应该回答「是」、「不是」还是「无关」。规则：- 「是」：问题的答案是肯定的 - 「不是」：问题答案是否定的 - 「无关」：问题与汤底无关。你只能回复「是」、「不是」或「无关」这三个词中的一个，不要添加任何其他内容。"
+
+# 统计追踪
+stats:
+  # 是否启用统计功能
+  enabled: true
+  # 排行榜显示人数
+  leaderboard-size: 10
+  # 自动保存间隔（秒）
+  auto-save-interval: 300
+  # 命中率排行榜最低提问数要求
+  min-questions-for-hit-rate: 10
