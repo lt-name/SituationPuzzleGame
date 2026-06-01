@@ -172,3 +172,10 @@ stats:
   auto-save-interval: 300
   # 命中率排行榜最低提问数要求
   min-questions-for-hit-rate: 10
+
+# 题目缓存
+cache:
+  # 是否启用题目缓存（缓存AI生成的题目到本地，减少API调用）
+  enabled: true
+  # 每个难度最大缓存题目数
+  max-per-difficulty: 20

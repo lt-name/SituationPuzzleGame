@@ -7,6 +7,7 @@ import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.plugin.PluginBase;
 import cn.lanink.situationpuzzlegame.ai.AiService;
+import cn.lanink.situationpuzzlegame.cache.PuzzleCache;
 import cn.lanink.situationpuzzlegame.command.MainCommand;
 import cn.lanink.situationpuzzlegame.config.PluginConfig;
 import cn.lanink.situationpuzzlegame.game.GameRoom;
@@ -21,12 +22,14 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
     private final Map<Player, GameRoom> playerRooms = new LinkedHashMap<>();
     private PluginConfig pluginConfig;
     private AiService aiService;
+    private PuzzleCache puzzleCache;
     private StatsManager statsManager;
 
     @Override
     public void onEnable() {
         pluginConfig = new PluginConfig(this);
         aiService = new AiService(pluginConfig);
+        puzzleCache = new PuzzleCache(this);
         statsManager = new StatsManager(this);
         if (pluginConfig.isStatsEnabled()) {
             statsManager.scheduleAutoSave(this, pluginConfig.getStatsAutoSaveInterval());
@@ -42,10 +45,13 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         for (GameRoom room : new ArrayList<>(rooms.values())) {
             destroyRoom(room);
         }
+        if (puzzleCache != null) {
+            puzzleCache.save();
+        }
         if (statsManager != null) {
             statsManager.save();
         }
-        getLogger().info("SituationPuzzleGame 插件已禁用！");
+        getLogger().info("SituationPuzzleGame 插件已卸载！");
     }
 
     @EventHandler
@@ -144,6 +150,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
 
     public PluginConfig getPluginConfig() { return pluginConfig; }
     public AiService getAiService() { return aiService; }
+    public PuzzleCache getPuzzleCache() { return puzzleCache; }
     public StatsManager getStatsManager() { return statsManager; }
 
     public void recordQuestionAnswered(GameRoom room, GameRoom.Question question) {

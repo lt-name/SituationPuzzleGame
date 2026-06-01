@@ -8,6 +8,7 @@ import cn.nukkit.ddui.ObservableOptions;
 import cn.nukkit.ddui.element.DropdownElement;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.lanink.situationpuzzlegame.SituationPuzzleGame;
+import cn.lanink.situationpuzzlegame.cache.PuzzleCache;
 import cn.lanink.situationpuzzlegame.config.PluginConfig;
 import cn.lanink.situationpuzzlegame.game.GameRoom;
 import cn.lanink.situationpuzzlegame.game.GameState;
@@ -111,6 +112,14 @@ public class UIFactory {
     }
 
     private static void generateAndShow(SituationPuzzleGame plugin, Player player, String difficulty) {
+        if (plugin.getPluginConfig().isCacheEnabled()) {
+            PuzzleCache.CachedPuzzle cached = plugin.getPuzzleCache().getPuzzleForPlayer(difficulty, player.getName());
+            if (cached != null) {
+                showAiConfirmForm(plugin, player, cached.title(), cached.truth(), difficulty);
+                return;
+            }
+        }
+
         if (!pendingGeneration.add(player)) {
             player.sendMessage("§c题目正在生成中，请稍候！");
             return;
@@ -132,6 +141,11 @@ public class UIFactory {
                     plugin.getLogger().error("AI 题目生成调用失败", ex);
                     showErrorForm(plugin, player, "§cAI 调用失败：" + ex.getMessage(), () -> showDifficultySelectForm(plugin, player));
                 } else if (result.isSuccess()) {
+                    if (plugin.getPluginConfig().isCacheEnabled()) {
+                        plugin.getPuzzleCache().addPuzzle(difficulty, result.getTitle(), result.getTruth());
+                        plugin.getPuzzleCache().markAsSeen(player.getName(), result.getTitle());
+                        plugin.getPuzzleCache().save();
+                    }
                     showAiConfirmForm(plugin, player, result.getTitle(), result.getTruth(), difficulty);
                 } else {
                     plugin.getLogger().error("AI 题目生成失败: " + result.getError());
@@ -508,6 +522,14 @@ public class UIFactory {
     }
 
     private static void generateSinglePlayerPuzzle(SituationPuzzleGame plugin, Player player, String difficulty) {
+        if (plugin.getPluginConfig().isCacheEnabled()) {
+            PuzzleCache.CachedPuzzle cached = plugin.getPuzzleCache().getPuzzleForPlayer(difficulty, player.getName());
+            if (cached != null) {
+                showSinglePlayerConfirmForm(plugin, player, cached.title(), cached.truth(), difficulty);
+                return;
+            }
+        }
+
         if (!pendingGeneration.add(player)) {
             player.sendMessage("§c题目正在生成中，请稍候！");
             return;
@@ -529,6 +551,11 @@ public class UIFactory {
                     plugin.getLogger().error("AI 题目生成调用失败(单人)", ex);
                     showErrorForm(plugin, player, "§cAI 调用失败：" + ex.getMessage(), () -> showSinglePlayerDifficultyForm(plugin, player));
                 } else if (result.isSuccess()) {
+                    if (plugin.getPluginConfig().isCacheEnabled()) {
+                        plugin.getPuzzleCache().addPuzzle(difficulty, result.getTitle(), result.getTruth());
+                        plugin.getPuzzleCache().markAsSeen(player.getName(), result.getTitle());
+                        plugin.getPuzzleCache().save();
+                    }
                     showSinglePlayerConfirmForm(plugin, player, result.getTitle(), result.getTruth(), difficulty);
                 } else {
                     plugin.getLogger().error("AI 题目生成失败(单人): " + result.getError());

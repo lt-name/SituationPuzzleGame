@@ -113,4 +113,12 @@ public class PluginConfig {
         return plugin.getConfig().getInt("stats.min-questions-for-hit-rate", 10);
     }
 
+    // Cache
+    public boolean isCacheEnabled() {
+        return plugin.getConfig().getBoolean("cache.enabled", true);
+    }
+
+    public int getCacheMaxPerDifficulty() {
+        return plugin.getConfig().getInt("cache.max-per-difficulty", 20);
+    }
 }
