@@ -6,7 +6,7 @@
 
     <groupId>cn.lanink.situationpuzzlegame</groupId>
     <artifactId>SituationPuzzleGame</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0<!-- -SNAPSHOT--></version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -55,15 +55,27 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <groupId>com.google.code.maven-replacer-plugin</groupId>
+                <artifactId>replacer</artifactId>
+                <version>1.5.3</version>
                 <executions>
                     <execution>
-                        <phase>package</phase>
+                        <id>add-version</id>
+                        <phase>process-sources</phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal>replace</goal>
                         </goals>
+                        <configuration>
+                            <includes>
+                                <include>${project.basedir}/src/main/resources/plugin.yml</include>
+                            </includes>
+                            <replacements>
+                                <replacement>
+                                    <token>version: ".*"</token>
+                                    <value>version: "${project.version}"</value>
+                                </replacement>
+                            </replacements>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

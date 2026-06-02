@@ -1,107 +1,109 @@
 # SituationPuzzleGame
 
-一个面向 Nukkit-MOT 服务器的海龟汤插件。玩家可以在服务器内通过表单创建房间、加入房间、提问、回答和查看统计；服主可以接入 AI，让插件自动生成题目并辅助回答「是 / 不是 / 无关」。
+Language: [![EN](https://img.shields.io/badge/EN-4c8bf5)](/README.md) [![中文](https://img.shields.io/badge/中文-d9d9d9)](/README_zh.md)
 
-## 适合谁用
+A "Situation Puzzle" (also known as "Lateral Thinking Puzzle") plugin for Nukkit-MOT servers. Players can create rooms, join games, ask questions, and view stats — all through in-game forms. Server owners can connect an AI to auto-generate puzzles and answer yes/no/irrelevant questions.
 
-- 想在 Minecraft Bedrock 服务器里开一局海龟汤、情境猜谜、推理小游戏的服主
-- 想让玩家自己创建房间、主持游戏，或者使用 AI 自动出题的服务器
-- 想提供单人 AI 推理模式和多人房间模式的休闲服、小游戏服
+## Who Is This For
 
-## 主要功能
+- Server owners who want to run situation puzzle / lateral thinking / deduction mini-games on their Minecraft Bedrock server
+- Servers that want players to host their own rooms, or use AI to auto-generate and auto-answer puzzles
+- Casual or mini-game servers looking for both single-player AI mode and multi-player room mode
 
-- 多人房间：玩家创建房间，主持人掌握汤底，其他玩家提问推理
-- 单人模式：AI 出题、自动回答问题，并在玩家还原关键真相时自动判定胜利
-- AI 出题：按难度自动生成汤面和汤底
-- AI 回答：主持人可让 AI 辅助判断玩家问题
-- 手动出题：不配置出题 AI 也可以由玩家手动填写汤面和汤底
-- 排行榜与个人统计：记录游戏次数、完成数、提问数、命中率、主持次数等
-- 题目缓存：缓存 AI 生成题目，减少重复 API 调用
-- 多语言资源：内置简体中文和英文语言文件
-- 兼容界面：新客户端使用 Data-Driven UI，旧客户端使用普通表单和聊天输入
+## Features
 
-## 运行要求
+- **Multi-player rooms**: Players create rooms, the host holds the truth, and others ask questions to deduce the answer
+- **Single-player mode**: AI generates puzzles and auto-answers questions; wins automatically when the player deduces key truths
+- **AI puzzle generation**: Auto-generates puzzle titles and truths by difficulty level
+- **AI answering**: Hosts can let AI help judge player questions
+- **Manual puzzles**: Without an AI generator, players can manually enter puzzle title and truth
+- **Leaderboard & stats**: Tracks games played, completions, questions asked, hit rate, hosting count, and more
+- **Puzzle cache**: Caches AI-generated puzzles to reduce repeated API calls
+- **Multi-language**: Bundled with Simplified Chinese and English language files
+- **Legacy client support**: New clients use Data-Driven UI; older clients fall back to standard forms with chat input
 
-- 服务端：Nukkit-MOT
-- Java：17 或更高
-- 客户端：Minecraft Bedrock 1.26.0 或更高可使用完整 Data-Driven UI
-- 低版本客户端仍可使用旧版表单流程，文本输入通过聊天栏完成
+## Requirements
 
-## 安装方法
+- Server: Nukkit-MOT
+- Java: 17 or higher
+- Client: Minecraft Bedrock 1.26.0+ for full Data-Driven UI
+- Older clients can still use the legacy form flow with chat-based text input
 
-1. 将 `SituationPuzzleGame` 插件 jar 放入服务器的 `plugins` 目录。
-2. 启动服务器一次，让插件生成默认配置文件。
-3. 打开 `plugins/SituationPuzzleGame/config.yml`，按需要配置 AI、统计和缓存。
-4. 重启服务器。
-5. 玩家进入服务器后输入 `/hgt` 打开海龟汤菜单。
+## Installation
 
-## 玩家命令
+1. Place the `SituationPuzzleGame` plugin jar into your server's `plugins` directory.
+2. Start the server once to generate the default config files.
+3. Open `plugins/SituationPuzzleGame/config.yml` and configure AI, stats, and cache as needed.
+4. Restart the server.
+5. Players enter `/hgt` in-game to open the puzzle menu.
 
-| 命令 | 说明 |
+## Player Commands
+
+| Command | Description |
 | --- | --- |
-| `/hgt` | 打开主菜单；如果玩家已在房间内，则打开当前游戏界面 |
-| `/hgt rank` | 打开排行榜 |
-| `/hgt top` | 打开排行榜 |
-| `/hgt stats` | 查看自己的统计数据 |
+| `/hgt` | Opens the main menu; if the player is already in a room, opens the current game UI |
+| `/hgt rank` | Opens the leaderboard |
+| `/hgt top` | Opens the leaderboard |
+| `/hgt stats` | Shows your personal stats |
 
-权限节点：
+Permission node:
 
 ```text
 situationpuzzlegame.use
 ```
 
-该权限默认对所有玩家开放。
+This permission is granted to all players by default.
 
-## 基本玩法
+## How to Play
 
-### 多人模式
+### Multi-player Mode
 
-1. 玩家输入 `/hgt`。
-2. 选择「创建房间」。
-3. 选择「AI 出题」或「手动出题」。
-4. 其他玩家输入 `/hgt`，选择「加入房间」。
-5. 主持人点击「开始游戏」。
-6. 猜题者提交是非题，主持人回答「是」「不是」「无关」。
-7. 主持人结束游戏后，插件会向房间玩家展示汤底。
+1. Player enters `/hgt`.
+2. Select "Create Room".
+3. Choose "AI Puzzle" or "Manual Puzzle".
+4. Other players enter `/hgt` and select "Join Room".
+5. The host clicks "Start Game".
+6. Guessers submit yes/no questions; the host answers "Yes", "No", or "Irrelevant".
+7. When the host ends the game, the truth is revealed to all players in the room.
 
-### 单人模式
+### Single-player Mode
 
-单人模式需要同时配置出题 AI 和回答 AI。
+Single-player mode requires both a generator AI and an answerer AI to be configured.
 
-1. 玩家输入 `/hgt`。
-2. 选择「单人模式」。
-3. 选择难度。
-4. AI 生成题目后，玩家开始推理。
-5. 玩家提出是非题，AI 自动回答；也可以直接提交最终推理。
-6. 当 AI 判断玩家已经还原关键真相时，单人模式会自动获胜并展示汤底。
-7. 玩家放弃后可查看汤底，但不会计入单人完成或连胜。
+1. Player enters `/hgt`.
+2. Select "Single Player Mode".
+3. Choose a difficulty.
+4. After the AI generates a puzzle, the player begins deducing.
+5. The player asks yes/no questions and the AI auto-answers; they can also submit a final deduction at any time.
+6. When the AI determines the player has recovered the key truths, the game auto-wins and reveals the truth.
+7. Giving up lets the player view the truth, but does not count as a single-player completion or streak.
 
-## AI 配置说明
+## AI Configuration
 
-配置文件位置：
+Config file location:
 
 ```text
 plugins/SituationPuzzleGame/config.yml
 ```
 
-插件把 AI 分成两类：
+The plugin splits AI into two roles:
 
-- `generator`：出题 AI，负责生成汤面和汤底
-- `answerer`：回答 AI，负责根据汤底判断玩家问题是、不是或无关
+- `generator`: The puzzle-generating AI, responsible for creating puzzle titles and truths
+- `answerer`: The answering AI, responsible for judging player questions as yes, no, or irrelevant
 
-默认配置中已经给出了 DeepSeek 和 OpenCode GO 的示例提供商。服主至少需要做两件事：
+The default config includes example providers for DeepSeek and OpenCode GO. At minimum, server owners need to:
 
-1. 把 `api-key` 改成真实密钥，不要保留默认占位文本。
-2. 确认 `generator.provider` 和 `answerer.provider` 指向你要使用的提供商名称。
+1. Replace `api-key` with a real key — do not keep the default placeholder text.
+2. Confirm that `generator.provider` and `answerer.provider` point to the provider name you want to use.
 
-示例：
+Example:
 
 ```yaml
 providers:
   deepseek-generator:
     api-type: "openai"
     api-url: "https://api.deepseek.com"
-    api-key: "你的 DeepSeek API 密钥"
+    api-key: "your DeepSeek API key"
     model: "deepseek-v4-pro"
     thinking-type: "enabled"
     reasoning-effort: "high"
@@ -109,7 +111,7 @@ providers:
   deepseek-answerer:
     api-type: "openai"
     api-url: "https://api.deepseek.com"
-    api-key: "你的 DeepSeek API 密钥"
+    api-key: "your DeepSeek API key"
     model: "deepseek-v4-flash"
     thinking-type: "disabled"
 
@@ -120,27 +122,27 @@ answerer:
   provider: "deepseek-answerer"
 ```
 
-`api-type` 支持：
+Supported `api-type` values:
 
-- `openai`：OpenAI 兼容的 `/chat/completions` 格式
-- `anthropic`：Anthropic `/v1/messages` 格式
+- `openai`: OpenAI-compatible `/chat/completions` format
+- `anthropic`: Anthropic `/v1/messages` format
 
-`api-url` 可以填写基础地址。插件会根据 `api-type` 自动补全请求端点；如果你已经填写完整的 `/chat/completions` 或 `/messages` 地址，插件会直接使用。
+`api-url` accepts a base URL — the plugin auto-appends the correct endpoint based on `api-type`. If you provide a full URL (e.g. `/chat/completions` or `/messages`), the plugin uses it as-is.
 
-## 难度配置
+## Difficulty Configuration
 
-默认难度有：
+Default difficulties:
 
-- 简单：新人向
-- 普通：标准海龟汤
-- 困难：推理爱好者
-- 地狱：硬核推理
+- Easy: Beginner-friendly
+- Normal: Standard situation puzzles
+- Hard: For deduction enthusiasts
+- Hell: Hardcore deduction
 
-你可以在 `generator.difficulties` 中修改显示名称、星级和描述。
+You can customize display names, star ratings, and descriptions in `generator.difficulties`.
 
-## 统计与缓存
+## Stats & Caching
 
-统计配置：
+Stats config:
 
 ```yaml
 stats:
@@ -150,13 +152,13 @@ stats:
   min-questions-for-hit-rate: 10
 ```
 
-统计数据会保存到：
+Stats data is saved to:
 
 ```text
 plugins/SituationPuzzleGame/stats.yml
 ```
 
-题目缓存配置：
+Puzzle cache config:
 
 ```yaml
 cache:
@@ -164,68 +166,68 @@ cache:
   max-per-difficulty: 20
 ```
 
-缓存数据会保存到：
+Cache data is saved to:
 
 ```text
 plugins/SituationPuzzleGame/puzzle_cache.yml
 ```
 
-开启缓存后，插件会保存 AI 生成过的题目，并尽量避免同一玩家重复抽到已看过的题目。
+When caching is enabled, the plugin stores previously generated puzzles and avoids giving the same player a puzzle they've already seen.
 
-## 旧客户端使用方式
+## Legacy Client Usage
 
-如果玩家客户端版本低于完整 Data-Driven UI 要求，插件会使用旧版表单菜单。旧版模式下，部分文本输入需要直接发送到聊天栏：
+If a player's client version does not support full Data-Driven UI, the plugin falls back to legacy form menus. In legacy mode, some text input is handled through the chat bar:
 
-- 手动创建题目时，在聊天栏发送汤面和汤底
-- 猜题者直接在聊天栏发送问题
-- 主持人可发送 `是`、`不是`、`无关` 回答当前问题
-- 主持人可发送 `AI` 调用 AI 回答
-- 输入 `记录` 可刷新提问记录
-- 输入 `离开` 可退出房间
-- 输入 `!消息` 可发送普通聊天内容
+- When manually creating a puzzle, send the title and truth in chat
+- Guessers send questions directly in chat
+- The host can send `是` (yes), `不是` (no), `无关` (irrelevant) to answer the current question
+- The host can send `AI` to invoke AI answering
+- Type `记录` (record) to refresh the question log
+- Type `离开` (leave) to leave the room
+- Type `!message` to send normal chat messages
 
-## 常见问题
+## FAQ
 
-### 主菜单里没有单人模式
+### Single-player mode is missing from the main menu
 
-单人模式需要同时启用出题 AI 和回答 AI。请检查：
+Single-player mode requires both a generator AI and an answerer AI. Please check:
 
-- `generator.provider` 是否指向存在的提供商
-- `answerer.provider` 是否指向存在的提供商
-- 两个提供商的 `api-key` 是否已经填写
+- `generator.provider` points to an existing provider
+- `answerer.provider` points to an existing provider
+- Both providers have a valid `api-key`
 
-### AI 出题或回答失败
+### AI puzzle generation or answering fails
 
-请检查：
+Please check:
 
-- `api-key` 是否正确
-- `api-url` 是否能从服务器访问
-- `api-type` 是否与服务商协议匹配
-- `model` 是否是服务商支持的模型名
-- 服务商账号是否有余额、额度或可用订阅
+- `api-key` is correct
+- `api-url` is reachable from the server
+- `api-type` matches the provider's protocol
+- `model` is a valid model name supported by the provider
+- Your provider account has available credits, quota, or an active subscription
 
-错误详情通常会输出在服务端控制台日志中。
+Error details are usually printed in the server console log.
 
-### 玩家无法使用命令
+### Players cannot use commands
 
-请确认玩家拥有：
+Make sure the player has:
 
 ```text
 situationpuzzlegame.use
 ```
 
-该权限默认开放；如果服务器安装了权限管理插件，请检查是否覆盖了默认权限。
+This permission is granted by default; if your server has a permissions management plugin, check whether it overrides the default.
 
-### 旧客户端不能输入表单文本
+### Legacy clients cannot input text in forms
 
-旧客户端会走聊天输入流程。让玩家按界面提示直接把汤面、汤底、问题或回答发送到聊天栏即可。
+Legacy clients use the chat input flow. Have players follow the on-screen instructions and send titles, truths, questions, or answers directly in the chat bar.
 
-## 文件速查
+## File Reference
 
-| 文件 | 用途 |
+| File | Purpose |
 | --- | --- |
-| `plugins/SituationPuzzleGame/config.yml` | 主配置，包含 AI、统计、缓存、难度 |
-| `plugins/SituationPuzzleGame/stats.yml` | 玩家统计数据 |
-| `plugins/SituationPuzzleGame/puzzle_cache.yml` | AI 题目缓存 |
-| `plugins/SituationPuzzleGame/language/zh_CN.lang` | 中文文案和 AI 提示词 |
-| `plugins/SituationPuzzleGame/language/en_US.lang` | 英文文案和 AI 提示词 |
+| `plugins/SituationPuzzleGame/config.yml` | Main config: AI, stats, cache, difficulties |
+| `plugins/SituationPuzzleGame/stats.yml` | Player statistics data |
+| `plugins/SituationPuzzleGame/puzzle_cache.yml` | AI puzzle cache |
+| `plugins/SituationPuzzleGame/language/zh_CN.lang` | Chinese text and AI prompts |
+| `plugins/SituationPuzzleGame/language/en_US.lang` | English text and AI prompts |
