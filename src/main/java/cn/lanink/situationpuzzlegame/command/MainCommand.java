@@ -38,18 +38,28 @@ public class MainCommand extends Command {
         if (args.length > 0 && plugin.getPluginConfig().isStatsEnabled()) {
             switch (args[0].toLowerCase()) {
                 case "rank", "top" -> {
-                    UIFactory.showLeaderboardMenu(plugin, player);
+                    if (UIFactory.supportsDdui(player)) {
+                        UIFactory.showLeaderboardMenu(plugin, player);
+                    } else {
+                        plugin.getLegacyUIFactory().showLeaderboardMenu(player);
+                    }
                     return true;
                 }
                 case "stats" -> {
-                    UIFactory.showPersonalStats(plugin, player);
+                    if (UIFactory.supportsDdui(player)) {
+                        UIFactory.showPersonalStats(plugin, player);
+                    } else {
+                        plugin.getLegacyUIFactory().showPersonalStats(player);
+                    }
                     return true;
                 }
             }
         }
 
         GameRoom room = plugin.getPlayerRoom(player);
-        if (room == null) {
+        if (!UIFactory.supportsDdui(player)) {
+            plugin.getLegacyUIFactory().showContext(player);
+        } else if (room == null) {
             UIFactory.showMainMenu(plugin, player);
         } else {
             UIFactory.showContextForm(plugin, player, room);

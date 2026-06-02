@@ -8,6 +8,7 @@ import cn.lanink.situationpuzzlegame.game.GameRoom;
 import cn.lanink.situationpuzzlegame.game.GameState;
 import cn.lanink.situationpuzzlegame.i18n.Texts;
 import cn.lanink.situationpuzzlegame.stats.StatsManager;
+import cn.lanink.situationpuzzlegame.ui.LegacyUIFactory;
 import cn.nukkit.Player;
 import cn.nukkit.ddui.DataDrivenScreen;
 import cn.nukkit.event.EventHandler;
@@ -29,6 +30,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
     @Getter private PuzzleCache puzzleCache;
     @Getter private StatsManager statsManager;
     @Getter private PluginI18n i18n;
+    @Getter private LegacyUIFactory legacyUIFactory;
 
     @Override
     public void onEnable() {
@@ -39,13 +41,15 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         aiService = new AiService(pluginConfig);
         puzzleCache = new PuzzleCache(this);
         statsManager = new StatsManager(this);
+        legacyUIFactory = new LegacyUIFactory(this);
         if (pluginConfig.isStatsEnabled()) {
             statsManager.scheduleAutoSave(this, pluginConfig.getStatsAutoSaveInterval());
         }
 
         getServer().getCommandMap().register("SituationPuzzleGame", new MainCommand(this));
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info(Texts.t(this, cn.nukkit.lang.LangCode.zh_CN, "log.plugin.enabled"));
+        getServer().getPluginManager().registerEvents(legacyUIFactory, this);
+        getLogger().info(Texts.t(this, LangCode.zh_CN, "log.plugin.enabled"));
     }
 
     @Override
@@ -59,7 +63,10 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         if (statsManager != null) {
             statsManager.save();
         }
-        getLogger().info(Texts.t(this, cn.nukkit.lang.LangCode.zh_CN, "log.plugin.disabled"));
+        if (legacyUIFactory != null) {
+            legacyUIFactory.clearAll();
+        }
+        getLogger().info(Texts.t(this, LangCode.zh_CN, "log.plugin.disabled"));
     }
 
     @EventHandler
@@ -105,6 +112,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
 
     public boolean joinRoom(Player player, GameRoom room) {
         if (playerRooms.containsKey(player)) return false;
+        if (rooms.get(room.getRoomId()) != room) return false;
         if (room.getState() != GameState.WAITING) return false;
         if (room.hasPlayer(player)) return false;
         room.addPlayer(player);
@@ -115,6 +123,9 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
     public void leaveRoom(Player player) {
         GameRoom room = playerRooms.remove(player);
         if (room == null) return;
+        if (legacyUIFactory != null) {
+            legacyUIFactory.clearPlayer(player);
+        }
         if (pluginConfig.isStatsEnabled()
                 && room.getState() == GameState.PLAYING
                 && !room.isSinglePlayer()) {
@@ -143,6 +154,9 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         rooms.remove(room.getRoomId());
         for (Player p : new ArrayList<>(room.getAllPlayers())) {
             playerRooms.remove(p);
+            if (legacyUIFactory != null) {
+                legacyUIFactory.clearPlayer(p);
+            }
             if (p.isConnected()) {
                 p.sendMessage(Texts.t(this, p, "message.room-destroyed"));
                 DataDrivenScreen.removeActiveScreen(p);

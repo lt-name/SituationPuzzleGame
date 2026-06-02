@@ -51,8 +51,12 @@ public class UIFactory {
         }
     }
 
+    public static boolean supportsDdui(Player player) {
+        return player.protocol >= MIN_DDUI_PROTOCOL;
+    }
+
     private static boolean checkDduiSupport(SituationPuzzleGame plugin, Player player) {
-        if (player.protocol >= MIN_DDUI_PROTOCOL) return true;
+        if (supportsDdui(player)) return true;
         player.sendMessage(t(plugin, player, "message.client-too-old"));
         player.sendMessage(t(plugin, player, "message.client-upgrade"));
         return false;
@@ -384,8 +388,12 @@ public class UIFactory {
                             rp.sendMessage(t(plugin, rp, "message.game-started"));
                             rp.sendMessage("§a=============================");
                             rp.sendMessage(t(plugin, rp, "message.puzzle-title", room.getPuzzleTitle()));
-                            rp.sendMessage(t(plugin, rp, "message.open-ui"));
-                            showGameForm(plugin, rp);
+                            if (supportsDdui(rp)) {
+                                rp.sendMessage(t(plugin, rp, "message.open-ui"));
+                                showGameForm(plugin, rp);
+                            } else {
+                                plugin.getLegacyUIFactory().showContext(rp);
+                            }
                         }
                     });
             form.divider();
@@ -562,7 +570,11 @@ public class UIFactory {
                                     rp.sendMessage(t(plugin, rp, "message.game-ended"));
                                     rp.sendMessage("§a=============================");
                                     rp.sendMessage(t(plugin, rp, "message.puzzle-truth", room.getPuzzleTruth()));
-                                    showResultForm(plugin, rp, room);
+                                    if (supportsDdui(rp)) {
+                                        showResultForm(plugin, rp, room);
+                                    } else {
+                                        plugin.getLegacyUIFactory().showContext(rp);
+                                    }
                                 }
                             });
                     confirm.button2(
