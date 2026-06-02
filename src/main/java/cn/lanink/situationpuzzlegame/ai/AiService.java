@@ -125,6 +125,40 @@ public class AiService {
         }
     }
 
+    public CompletableFuture<SoloAnswerResult> answerSoloQuestion(
+            String truth, String question, LangCode lang) {
+        try {
+            AiProviderConfig provider = requireProvider(config.getAnswererProvider(), "answerer");
+            String apiUrl = provider.getApiUrl();
+            String configuredModel = provider.getModel();
+            String model = normalizeModel(configuredModel);
+            boolean openCodeGoProvider = isOpenCodeGoConfig(configuredModel, apiUrl);
+            String requestApiType =
+                    resolveRequestApiType(provider.getApiType(), model, apiUrl, openCodeGoProvider);
+            JsonObject body = new JsonObject();
+            body.addProperty("model", model);
+
+            applySystemAndMessages(
+                    body,
+                    config.getSoloAnswererSystemPrompt(lang),
+                    config.getSoloAnswererUserPrompt(lang, truth, question),
+                    requestApiType);
+            applyThinking(
+                    body,
+                    provider.getThinkingType(),
+                    provider.getReasoningEffort(),
+                    requestApiType,
+                    openCodeGoProvider);
+            applyMaxTokens(body, requestApiType);
+
+            return callApi(apiUrl, provider.getApiKey(), body, requestApiType, openCodeGoProvider)
+                    .orTimeout(60, TimeUnit.SECONDS)
+                    .thenApply(response -> parseSoloAnswerResponse(response, requestApiType));
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
     private void applySystemAndMessages(
             JsonObject body, String systemPrompt, String userPrompt, String apiType) {
         if (API_TYPE_ANTHROPIC.equals(apiType)) {
@@ -229,21 +263,38 @@ public class AiService {
     private GameRoom.AnswerType parseAnswerResponse(String responseBody, String apiType) {
         try {
             String content = extractContent(responseBody, apiType).trim();
-            String normalized = content.toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Punct}§]+", "");
-            if (normalized.contains("irrelevant")
-                    || normalized.contains("unrelated")
-                    || content.contains("无关")
-                    || content.contains("不相关")) {
-                return GameRoom.AnswerType.IRRELEVANT;
-            } else if (normalized.contains("no") || content.contains("不是") || content.contains("否")) {
-                return GameRoom.AnswerType.NO;
-            } else if (normalized.contains("yes") || content.contains("是")) {
-                return GameRoom.AnswerType.YES;
-            }
-            return GameRoom.AnswerType.IRRELEVANT;
+            return parseAnswerType(content);
         } catch (Exception e) {
             throw new RuntimeException("解析回答失败: " + e.getMessage(), e);
         }
+    }
+
+    private SoloAnswerResult parseSoloAnswerResponse(String responseBody, String apiType) {
+        try {
+            String content = extractContent(responseBody, apiType).trim();
+            String jsonStr = extractJson(content);
+            JsonObject parsed = JsonParser.parseString(jsonStr).getAsJsonObject();
+            GameRoom.AnswerType answerType = parseAnswerType(parsed.get("answer").getAsString());
+            boolean solved = parsed.has("solved") && parsed.get("solved").getAsBoolean();
+            return new SoloAnswerResult(answerType, solved);
+        } catch (Exception e) {
+            throw new RuntimeException("解析单人回答失败: " + e.getMessage(), e);
+        }
+    }
+
+    private GameRoom.AnswerType parseAnswerType(String content) {
+        String normalized = content.toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Punct}§]+", "");
+        if (normalized.contains("irrelevant")
+                || normalized.contains("unrelated")
+                || content.contains("无关")
+                || content.contains("不相关")) {
+            return GameRoom.AnswerType.IRRELEVANT;
+        } else if (normalized.contains("no") || content.contains("不是") || content.contains("否")) {
+            return GameRoom.AnswerType.NO;
+        } else if (normalized.contains("yes") || content.contains("是")) {
+            return GameRoom.AnswerType.YES;
+        }
+        return GameRoom.AnswerType.IRRELEVANT;
     }
 
     private String extractContent(String responseBody, String apiType) {
@@ -399,4 +450,6 @@ public class AiService {
             return new GenerateResult(false, null, null, error);
         }
     }
+
+    public record SoloAnswerResult(GameRoom.AnswerType answerType, boolean solved) {}
 }

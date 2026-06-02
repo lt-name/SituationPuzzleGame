@@ -33,7 +33,9 @@ public class LegacyUIFactory implements Listener {
 
     private enum ChatMode {
         MANUAL_TITLE,
-        MANUAL_TRUTH
+        MANUAL_TRUTH,
+        CONFIRM_FINISH,
+        CONFIRM_GIVE_UP
     }
 
     private record ChatSession(ChatMode mode, String title) {}
@@ -66,6 +68,8 @@ public class LegacyUIFactory implements Listener {
         pendingGeneration.remove(player);
         pendingAiAnswer.remove(player);
     }
+
+    // ==================== GUI 入口（仅由 /hgt 命令和表单按钮触发） ====================
 
     public void showContext(Player player) {
         GameRoom room = plugin.getPlayerRoom(player);
@@ -409,14 +413,26 @@ public class LegacyUIFactory implements Listener {
             content.append(t(player, "header.pending-questions", room.getUnansweredCount()))
                     .append("\n")
                     .append(t(player, "label.question-from", current.getAskerName(), current.getQuestion()));
-            actions.add(button(t(player, "answer.yes"), p -> answerCurrentQuestion(p, room, GameRoom.AnswerType.YES)));
-            actions.add(button(t(player, "answer.no"), p -> answerCurrentQuestion(p, room, GameRoom.AnswerType.NO)));
+            actions.add(button(t(player, "answer.yes"), p -> {
+                answerCurrentQuestion(p, room, GameRoom.AnswerType.YES);
+                if (room.getState() == GameState.PLAYING) showHostGameMenu(p, room);
+            }));
+            actions.add(button(t(player, "answer.no"), p -> {
+                answerCurrentQuestion(p, room, GameRoom.AnswerType.NO);
+                if (room.getState() == GameState.PLAYING) showHostGameMenu(p, room);
+            }));
             actions.add(
                     button(
                             t(player, "answer.irrelevant"),
-                            p -> answerCurrentQuestion(p, room, GameRoom.AnswerType.IRRELEVANT)));
+                            p -> {
+                                answerCurrentQuestion(p, room, GameRoom.AnswerType.IRRELEVANT);
+                                if (room.getState() == GameState.PLAYING) showHostGameMenu(p, room);
+                            }));
             if (plugin.getPluginConfig().isAnswererEnabled()) {
-                actions.add(button(t(player, "button.ai-answer"), p -> answerCurrentQuestionWithAi(p, room)));
+                actions.add(button(t(player, "button.ai-answer"),
+                        p -> answerCurrentQuestionWithAi(p, room, () -> {
+                            if (room.getState() == GameState.PLAYING) showHostGameMenu(p, room);
+                        })));
             }
         }
         content.append("\n\n").append(t(player, "legacy.host-chat-hint"));
@@ -468,10 +484,12 @@ public class LegacyUIFactory implements Listener {
                 room.isHost(player)
                         ? t(player, "button.destroy-room")
                         : t(player, "button.leave-room");
+        String content = t(player, "result.body", room.getPuzzleTitle(), room.getPuzzleTruth())
+                + "\n\n" + t(player, "legacy.result-chat-hint");
         showSimple(
                 player,
                 t(player, "title.result", room.getRoomId()),
-                t(player, "result.body", room.getPuzzleTitle(), room.getPuzzleTruth()),
+                content,
                 List.of(
                         button(
                                 actionLabel,
@@ -486,6 +504,8 @@ public class LegacyUIFactory implements Listener {
                                 }),
                         button(t(player, "button.close"), p -> {})));
     }
+
+    // ==================== 游戏动作（不含 GUI 弹窗） ====================
 
     private void generateMultiplayerPuzzle(Player player, String difficulty) {
         if (plugin.getPlayerRoom(player) != null) {
@@ -650,7 +670,6 @@ public class LegacyUIFactory implements Listener {
                 UIFactory.showGameForm(plugin, rp);
             } else {
                 rp.sendMessage(t(rp, room.isHost(rp) ? "legacy.host-chat-hint" : "legacy.guesser-chat-hint"));
-                showGameMenu(rp, room);
             }
         }
     }
@@ -672,23 +691,35 @@ public class LegacyUIFactory implements Listener {
             if (UIFactory.supportsDdui(rp)) {
                 UIFactory.showResultForm(plugin, rp, room);
             } else {
-                showResultMenu(rp, room);
+                rp.sendMessage(t(rp, "legacy.result-chat-hint"));
             }
         }
     }
 
     private void finishSinglePlayerGame(Player player, GameRoom room) {
+        finishSinglePlayerGame(player, room, false);
+    }
+
+    private void finishSinglePlayerGame(Player player, GameRoom room, boolean solved) {
         if (!room.isSinglePlayer() || room.getState() != GameState.PLAYING) return;
         room.finishGame();
         if (plugin.getPluginConfig().isStatsEnabled()) {
-            plugin.getStatsManager().getStats(player.getName()).recordSoloGameCompleted();
+            PlayerStats stats = plugin.getStatsManager().getStats(player.getName());
+            if (solved) {
+                stats.recordSoloGameCompleted();
+            } else {
+                stats.recordSoloGameAbandoned();
+            }
             plugin.getStatsManager().markDirty();
         }
         player.sendMessage("§a=============================");
-        player.sendMessage(t(player, "message.game-ended"));
+        player.sendMessage(t(player, solved ? "message.single-solved" : "message.game-ended"));
+        if (solved) {
+            player.sendMessage(t(player, "message.single-auto-win"));
+        }
         player.sendMessage("§a=============================");
         player.sendMessage(t(player, "message.puzzle-truth", room.getPuzzleTruth()));
-        showResultMenu(player, room);
+        player.sendMessage(t(player, "legacy.result-chat-hint"));
     }
 
     private void answerCurrentQuestion(Player player, GameRoom room, GameRoom.AnswerType answerType) {
@@ -696,16 +727,14 @@ public class LegacyUIFactory implements Listener {
         GameRoom.Question current = room.getFirstUnansweredQuestion();
         if (current == null) {
             player.sendMessage(t(player, "label.no-pending-questions"));
-            showHostGameMenu(player, room);
             return;
         }
         room.answerQuestion(current, answerType);
         plugin.recordQuestionAnswered(room, current);
         notifyAnswer(room, current);
-        showHostGameMenu(player, room);
     }
 
-    private void answerCurrentQuestionWithAi(Player player, GameRoom room) {
+    private void answerCurrentQuestionWithAi(Player player, GameRoom room, Runnable afterComplete) {
         if (!room.isHost(player) || room.getState() != GameState.PLAYING) return;
         GameRoom.Question current = room.getFirstUnansweredQuestion();
         if (current == null) {
@@ -738,7 +767,7 @@ public class LegacyUIFactory implements Listener {
                                                         plugin.getLogger().error("AI 回答失败(多人聊天模式)", ex);
                                                         player.sendMessage(
                                                                 t(player, "message.ai-answer-failed", ex.getMessage()));
-                                                        showHostGameMenu(player, room);
+                                                        if (afterComplete != null) afterComplete.run();
                                                         return;
                                                     }
                                                     if (!current.isAnswered()) {
@@ -746,9 +775,11 @@ public class LegacyUIFactory implements Listener {
                                                         plugin.recordQuestionAnswered(room, current);
                                                         notifyAnswer(room, current);
                                                     }
-                                                    showHostGameMenu(player, room);
+                                                    if (afterComplete != null) afterComplete.run();
                                                 }));
     }
+
+    // ==================== 聊天事件处理（全 sendMessage，不弹 GUI） ====================
 
     @EventHandler
     public void onFormResponded(PlayerFormRespondedEvent event) {
@@ -804,17 +835,7 @@ public class LegacyUIFactory implements Listener {
             return handleWaitingChat(player, room, message);
         }
         if (room.getState() == GameState.FINISHED) {
-            if (isLeave(message)) {
-                if (room.isHost(player)) {
-                    plugin.destroyRoom(room);
-                } else {
-                    plugin.leaveRoom(player);
-                    clearPlayer(player);
-                    player.sendMessage(t(player, "message.left-room"));
-                }
-                return true;
-            }
-            return false;
+            return handleFinishedChat(player, room, message);
         }
         if (room.isSinglePlayer()) {
             return handleSinglePlayerChat(player, room, message);
@@ -833,7 +854,30 @@ public class LegacyUIFactory implements Listener {
         if (isCancel(message)) {
             chatSessions.remove(player);
             player.sendMessage(t(player, "legacy.input-cancelled"));
-            showCreateRoomMenu(player);
+            return;
+        }
+        if (session.mode() == ChatMode.CONFIRM_FINISH) {
+            chatSessions.remove(player);
+            if (isConfirm(message)) {
+                GameRoom room = plugin.getPlayerRoom(player);
+                if (room != null && room.isHost(player) && room.getState() == GameState.PLAYING) {
+                    finishMultiplayerGame(player, room);
+                }
+            } else {
+                player.sendMessage(t(player, "legacy.confirm-cancelled"));
+            }
+            return;
+        }
+        if (session.mode() == ChatMode.CONFIRM_GIVE_UP) {
+            chatSessions.remove(player);
+            if (isConfirm(message)) {
+                GameRoom room = plugin.getPlayerRoom(player);
+                if (room != null && room.isSinglePlayer() && room.getState() == GameState.PLAYING) {
+                    finishSinglePlayerGame(player, room);
+                }
+            } else {
+                player.sendMessage(t(player, "legacy.confirm-cancelled"));
+            }
             return;
         }
         if (session.mode() == ChatMode.MANUAL_TITLE) {
@@ -855,11 +899,10 @@ public class LegacyUIFactory implements Listener {
             GameRoom room = plugin.createRoom(player, session.title(), message);
             if (room == null) {
                 player.sendMessage(t(player, "message.create-failed"));
-                showCreateRoomMenu(player);
                 return;
             }
             player.sendMessage(t(player, "message.room-created"));
-            showLobbyMenu(player, room);
+            sendLobbyInfo(player, room);
         }
     }
 
@@ -879,7 +922,7 @@ public class LegacyUIFactory implements Listener {
             return true;
         }
         if (isRefresh(message)) {
-            showLobbyMenu(player, room);
+            sendLobbyInfo(player, room);
             return true;
         }
         return false;
@@ -893,7 +936,7 @@ public class LegacyUIFactory implements Listener {
             return true;
         }
         if (isRefresh(message) || isQa(message)) {
-            showGuesserGameMenu(player, room);
+            sendGameQA(player, room);
             return true;
         }
         GameRoom.Question q = room.askQuestion(player, message);
@@ -903,28 +946,29 @@ public class LegacyUIFactory implements Listener {
         }
         room.getHost().sendMessage(t(room.getHost(), "message.host-question", player.getName(), message));
         player.sendMessage(t(player, "message.question-submitted"));
-        if (!UIFactory.supportsDdui(room.getHost())) {
-            showHostGameMenu(room.getHost(), room);
-        }
         return q != null;
     }
 
     private boolean handleHostChat(Player player, GameRoom room, String message) {
         if (isFinish(message)) {
-            showFinishConfirmMenu(player, room);
+            chatSessions.put(player, new ChatSession(ChatMode.CONFIRM_FINISH, null));
+            player.sendMessage(t(player, "confirm.finish-body"));
+            player.sendMessage(t(player, "legacy.confirm-hint"));
             return true;
         }
         if (isRefresh(message) || isQa(message)) {
-            showHostGameMenu(player, room);
+            sendGameQA(player, room);
+            sendHostQuestionInfo(player, room);
             return true;
         }
         GameRoom.AnswerType answer = parseAnswer(message);
         if (answer != null) {
             answerCurrentQuestion(player, room, answer);
+            sendHostQuestionInfo(player, room);
             return true;
         }
         if (isAi(message)) {
-            answerCurrentQuestionWithAi(player, room);
+            answerCurrentQuestionWithAi(player, room, () -> sendHostQuestionInfo(player, room));
             return true;
         }
         return false;
@@ -932,11 +976,13 @@ public class LegacyUIFactory implements Listener {
 
     private boolean handleSinglePlayerChat(Player player, GameRoom room, String message) {
         if (isFinish(message)) {
-            showGiveUpConfirmMenu(player, room);
+            chatSessions.put(player, new ChatSession(ChatMode.CONFIRM_GIVE_UP, null));
+            player.sendMessage(t(player, "confirm.give-up-body"));
+            player.sendMessage(t(player, "legacy.confirm-hint"));
             return true;
         }
         if (isRefresh(message) || isQa(message)) {
-            showSinglePlayerGameMenu(player, room);
+            sendGameQA(player, room);
             return true;
         }
         if (!plugin.getPluginConfig().isAnswererEnabled()) {
@@ -955,9 +1001,9 @@ public class LegacyUIFactory implements Listener {
         player.sendMessage(t(player, "label.you-question", message) + "§e" + t(player, "loading.ai-thinking") + "...");
         plugin
                 .getAiService()
-                .answerQuestion(room.getPuzzleTruth(), message, lang(player))
+                .answerSoloQuestion(room.getPuzzleTruth(), message, lang(player))
                 .whenComplete(
-                        (answer, ex) ->
+                        (result, ex) ->
                                 plugin
                                         .getServer()
                                         .getScheduler()
@@ -972,6 +1018,7 @@ public class LegacyUIFactory implements Listener {
                                                                 t(player, "message.ai-answer-failed", ex.getMessage()));
                                                         return;
                                                     }
+                                                    GameRoom.AnswerType answer = result.answerType();
                                                     room.answerQuestion(q, answer);
                                                     plugin.recordQuestionAnswered(room, q);
                                                     player.sendMessage(
@@ -981,10 +1028,66 @@ public class LegacyUIFactory implements Listener {
                                                                     q.getAskerName(),
                                                                     q.getQuestion(),
                                                                     Texts.answerLabel(answer, lang(player))));
-                                                    showSinglePlayerGameMenu(player, room);
+                                                    if (result.solved()) {
+                                                        finishSinglePlayerGame(player, room, true);
+                                                    }
                                                 }));
         return true;
     }
+
+    private boolean handleFinishedChat(Player player, GameRoom room, String message) {
+        if (isLeave(message)) {
+            if (room.isHost(player)) {
+                plugin.destroyRoom(room);
+            } else {
+                plugin.leaveRoom(player);
+                clearPlayer(player);
+                player.sendMessage(t(player, "message.left-room"));
+            }
+            return true;
+        }
+        if (isQa(message)) {
+            sendGameQA(player, room);
+            return true;
+        }
+        if (isFinish(message) || isRefresh(message)) {
+            sendResultInfo(player, room);
+            return true;
+        }
+        return false;
+    }
+
+    // ==================== 聊天输出辅助（纯 sendMessage） ====================
+
+    private void sendLobbyInfo(Player player, GameRoom room) {
+        player.sendMessage("§e" + t(player, "title.room", room.getRoomId()));
+        player.sendMessage(buildLobbyText(player, room));
+        player.sendMessage(t(player, "legacy.lobby-chat-hint"));
+    }
+
+    private void sendGameQA(Player player, GameRoom room) {
+        player.sendMessage(t(player, "message.puzzle-title", room.getPuzzleTitle()));
+        player.sendMessage(buildAnsweredQAText(room, lang(player)));
+    }
+
+    private void sendHostQuestionInfo(Player player, GameRoom room) {
+        GameRoom.Question current = room.getFirstUnansweredQuestion();
+        if (current == null) {
+            player.sendMessage(t(player, "label.no-pending-questions"));
+        } else {
+            player.sendMessage(t(player, "label.question-from", current.getAskerName(), current.getQuestion()));
+            player.sendMessage(t(player, "legacy.host-chat-hint"));
+        }
+    }
+
+    private void sendResultInfo(Player player, GameRoom room) {
+        player.sendMessage("§a=============================");
+        player.sendMessage(t(player, "result.body", room.getPuzzleTitle(), room.getPuzzleTruth()));
+        player.sendMessage("§a=============================");
+        player.sendMessage(t(player, "legacy.result-chat-hint"));
+    }
+
+    // ==================== 工具方法 ====================
 
     private boolean isActivePlayingRoom(Player player, GameRoom room) {
         return player.isConnected()
@@ -1114,6 +1217,10 @@ public class LegacyUIFactory implements Listener {
 
     private boolean isCancel(String message) {
         return Set.of("取消", "cancel").contains(normalize(message));
+    }
+
+    private boolean isConfirm(String message) {
+        return Set.of("确认", "confirm").contains(normalize(message));
     }
 
     private boolean isRefresh(String message) {

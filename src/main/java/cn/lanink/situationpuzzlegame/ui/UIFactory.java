@@ -785,7 +785,7 @@ public class UIFactory {
 
         Observable<String> questionObs =
                 new Observable<>("", ObservableOptions.builder().clientWritable(true).build());
-        form.textField(t(plugin, player, "field.yes-no-question"), questionObs);
+        form.textField(t(plugin, player, "field.single-question"), questionObs);
 
         boolean[] waiting = {false};
         String[] animFrames = loadingFrames(t(plugin, player, "loading.ai-thinking"));
@@ -824,9 +824,9 @@ public class UIFactory {
 
                     plugin
                             .getAiService()
-                            .answerQuestion(room.getPuzzleTruth(), question, lang(p))
+                            .answerSoloQuestion(room.getPuzzleTruth(), question, lang(p))
                             .whenComplete(
-                                    (answer, ex) -> {
+                                    (result, ex) -> {
                                         plugin
                                                 .getServer()
                                                 .getScheduler()
@@ -834,7 +834,7 @@ public class UIFactory {
                                                         plugin,
                                                         () -> {
                                                             animTask.cancel();
-                                                            if (!player.isConnected()) return;
+                                                            if (!isActivePlayingRoom(plugin, p, room)) return;
                                                             waiting[0] = false;
                                                             if (ex != null) {
                                                                 plugin.getLogger().error("AI 回答失败(单人)", ex);
@@ -847,10 +847,14 @@ public class UIFactory {
                                                                                         ex.getMessage()));
                                                                 return;
                                                             }
+                                                            GameRoom.AnswerType answer = result.answerType();
                                                             room.answerQuestion(q, answer);
                                                             plugin.recordQuestionAnswered(room, q);
                                                             qaObs.setValue(buildAnsweredQAText(plugin, room, lang(player)));
                                                             pendingObs.setValue("");
+                                                            if (result.solved()) {
+                                                                finishSinglePlayerGame(plugin, p, room, true);
+                                                            }
                                                         });
                                     });
                 });
@@ -863,18 +867,7 @@ public class UIFactory {
                     confirm.body(t(plugin, player, "confirm.give-up-body"));
                     confirm.button1(
                             t(plugin, player, "button.confirm-give-up"),
-                            cp -> {
-                                room.finishGame();
-                                if (plugin.getPluginConfig().isStatsEnabled()) {
-                                    plugin.getStatsManager().getStats(cp.getName()).recordSoloGameCompleted();
-                                    plugin.getStatsManager().markDirty();
-                                }
-                                cp.sendMessage("§a=============================");
-                                cp.sendMessage(t(plugin, cp, "message.game-ended"));
-                                cp.sendMessage("§a=============================");
-                                cp.sendMessage(t(plugin, cp, "message.puzzle-truth", room.getPuzzleTruth()));
-                                showResultForm(plugin, cp, room);
-                            });
+                            cp -> finishSinglePlayerGame(plugin, cp, room, false));
                     confirm.button2(
                             t(plugin, player, "button.continue-reasoning"),
                             cp -> showSinglePlayerGameForm(plugin, cp));
@@ -882,6 +875,36 @@ public class UIFactory {
                 });
 
         form.show(player);
+    }
+
+    private static void finishSinglePlayerGame(
+            SituationPuzzleGame plugin, Player player, GameRoom room, boolean solved) {
+        if (!isActivePlayingRoom(plugin, player, room)) return;
+        room.finishGame();
+        if (plugin.getPluginConfig().isStatsEnabled()) {
+            PlayerStats stats = plugin.getStatsManager().getStats(player.getName());
+            if (solved) {
+                stats.recordSoloGameCompleted();
+            } else {
+                stats.recordSoloGameAbandoned();
+            }
+            plugin.getStatsManager().markDirty();
+        }
+        player.sendMessage("§a=============================");
+        player.sendMessage(t(plugin, player, solved ? "message.single-solved" : "message.game-ended"));
+        if (solved) {
+            player.sendMessage(t(plugin, player, "message.single-auto-win"));
+        }
+        player.sendMessage("§a=============================");
+        player.sendMessage(t(plugin, player, "message.puzzle-truth", room.getPuzzleTruth()));
+        showResultForm(plugin, player, room);
+    }
+
+    private static boolean isActivePlayingRoom(
+            SituationPuzzleGame plugin, Player player, GameRoom room) {
+        return player.isConnected()
+                && plugin.getPlayerRoom(player) == room
+                && room.getState() == GameState.PLAYING;
     }
 
     private static String buildAnsweredQAText(

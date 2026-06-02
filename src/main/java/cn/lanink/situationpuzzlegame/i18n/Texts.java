@@ -48,6 +48,9 @@ public final class Texts {
             return key;
         }
         String text = i18n.getOrOriginal(normalize(lang), key);
+        if (text == null) {
+            return key;
+        }
         for (int i = 0; i < args.length; i++) {
             text = text.replace("{%" + i + "}", String.valueOf(args[i]));
         }
