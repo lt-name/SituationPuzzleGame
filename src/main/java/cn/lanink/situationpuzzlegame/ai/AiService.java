@@ -2,11 +2,12 @@ package cn.lanink.situationpuzzlegame.ai;
 
 import cn.lanink.situationpuzzlegame.config.AiProviderConfig;
 import cn.lanink.situationpuzzlegame.config.PluginConfig;
+import cn.lanink.situationpuzzlegame.game.GameRoom;
+import cn.nukkit.lang.LangCode;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,59 +17,65 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class AiService {
 
     private static final String API_TYPE_OPENAI = "openai";
     private static final String API_TYPE_ANTHROPIC = "anthropic";
     private static final String OPENCODE_GO_MODEL_PREFIX = "opencode-go/";
     private static final String OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1";
-    private static final Set<String> OPENCODE_GO_OPENAI_MODELS = Set.of(
-            "glm-5.1",
-            "glm-5",
-            "kimi-k2.5",
-            "kimi-k2.6",
-            "deepseek-v4-pro",
-            "deepseek-v4-flash",
-            "mimo-v2.5",
-            "mimo-v2.5-pro"
-    );
-    private static final Set<String> OPENCODE_GO_ANTHROPIC_MODELS = Set.of(
-            "minimax-m3",
-            "minimax-m2.7",
-            "minimax-m2.5",
-            "qwen3.7-max",
-            "qwen3.6-plus"
-    );
+    private static final Set<String> OPENCODE_GO_OPENAI_MODELS =
+            Set.of(
+                    "glm-5.1",
+                    "glm-5",
+                    "kimi-k2.5",
+                    "kimi-k2.6",
+                    "deepseek-v4-pro",
+                    "deepseek-v4-flash",
+                    "mimo-v2.5",
+                    "mimo-v2.5-pro");
+    private static final Set<String> OPENCODE_GO_ANTHROPIC_MODELS =
+            Set.of("minimax-m3", "minimax-m2.7", "minimax-m2.5", "qwen3.7-max", "qwen3.6-plus");
 
-    private final HttpClient httpClient;
     private final PluginConfig config;
-
-    public AiService(PluginConfig config) {
-        this.config = config;
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-    }
+    private final HttpClient httpClient =
+            HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
 
     public CompletableFuture<GenerateResult> generatePuzzle(String difficultyPrompt) {
+        return generatePuzzle(difficultyPrompt, LangCode.zh_CN);
+    }
+
+    public CompletableFuture<GenerateResult> generatePuzzle(String difficultyPrompt, LangCode lang) {
         try {
             AiProviderConfig provider = requireProvider(config.getGeneratorProvider(), "generator");
             String apiUrl = provider.getApiUrl();
             String configuredModel = provider.getModel();
             String model = normalizeModel(configuredModel);
             boolean openCodeGoProvider = isOpenCodeGoConfig(configuredModel, apiUrl);
-            String requestApiType = resolveRequestApiType(provider.getApiType(), model, apiUrl, openCodeGoProvider);
+            String requestApiType =
+                    resolveRequestApiType(provider.getApiType(), model, apiUrl, openCodeGoProvider);
             JsonObject body = new JsonObject();
             body.addProperty("model", model);
 
-            String systemPrompt = config.getGeneratorSystemPrompt();
+            String systemPrompt = config.getGeneratorSystemPrompt(lang);
             if (difficultyPrompt != null && !difficultyPrompt.isBlank()) {
                 systemPrompt += "\n\n" + difficultyPrompt;
             }
-            applySystemAndMessages(body, systemPrompt, "请生成一道海龟汤题目。", requestApiType);
-            applyThinking(body, provider.getThinkingType(), provider.getReasoningEffort(), requestApiType, openCodeGoProvider);
+            applySystemAndMessages(
+                    body, systemPrompt, config.getGeneratorUserPrompt(lang), requestApiType);
+            applyThinking(
+                    body,
+                    provider.getThinkingType(),
+                    provider.getReasoningEffort(),
+                    requestApiType,
+                    openCodeGoProvider);
             applyMaxTokens(body, requestApiType);
 
             return callApi(apiUrl, provider.getApiKey(), body, requestApiType, openCodeGoProvider)
@@ -80,20 +87,34 @@ public class AiService {
         }
     }
 
-    public CompletableFuture<String> answerQuestion(String truth, String question) {
+    public CompletableFuture<GameRoom.AnswerType> answerQuestion(String truth, String question) {
+        return answerQuestion(truth, question, LangCode.zh_CN);
+    }
+
+    public CompletableFuture<GameRoom.AnswerType> answerQuestion(
+            String truth, String question, LangCode lang) {
         try {
             AiProviderConfig provider = requireProvider(config.getAnswererProvider(), "answerer");
             String apiUrl = provider.getApiUrl();
             String configuredModel = provider.getModel();
             String model = normalizeModel(configuredModel);
             boolean openCodeGoProvider = isOpenCodeGoConfig(configuredModel, apiUrl);
-            String requestApiType = resolveRequestApiType(provider.getApiType(), model, apiUrl, openCodeGoProvider);
+            String requestApiType =
+                    resolveRequestApiType(provider.getApiType(), model, apiUrl, openCodeGoProvider);
             JsonObject body = new JsonObject();
             body.addProperty("model", model);
 
-            applySystemAndMessages(body, config.getAnswererSystemPrompt(),
-                    "汤底：" + truth + "\n\n玩家提问：" + question, requestApiType);
-            applyThinking(body, provider.getThinkingType(), provider.getReasoningEffort(), requestApiType, openCodeGoProvider);
+            applySystemAndMessages(
+                    body,
+                    config.getAnswererSystemPrompt(lang),
+                    config.getAnswererUserPrompt(lang, truth, question),
+                    requestApiType);
+            applyThinking(
+                    body,
+                    provider.getThinkingType(),
+                    provider.getReasoningEffort(),
+                    requestApiType,
+                    openCodeGoProvider);
             applyMaxTokens(body, requestApiType);
 
             return callApi(apiUrl, provider.getApiKey(), body, requestApiType, openCodeGoProvider)
@@ -104,7 +125,8 @@ public class AiService {
         }
     }
 
-    private void applySystemAndMessages(JsonObject body, String systemPrompt, String userPrompt, String apiType) {
+    private void applySystemAndMessages(
+            JsonObject body, String systemPrompt, String userPrompt, String apiType) {
         if (API_TYPE_ANTHROPIC.equals(apiType)) {
             body.addProperty("system", systemPrompt);
             JsonArray messages = new JsonArray();
@@ -133,8 +155,12 @@ public class AiService {
         }
     }
 
-    private void applyThinking(JsonObject body, String thinkingType, String reasoningEffort,
-                               String requestApiType, boolean openCodeGoProvider) {
+    private void applyThinking(
+            JsonObject body,
+            String thinkingType,
+            String reasoningEffort,
+            String requestApiType,
+            boolean openCodeGoProvider) {
         if (thinkingType == null || "disabled".equals(thinkingType)) return;
         if (openCodeGoProvider) return;
 
@@ -155,12 +181,15 @@ public class AiService {
         }
     }
 
-    private CompletableFuture<String> callApi(String url, String apiKey, JsonObject body,
-                                              String requestApiType, boolean openCodeGoProvider) {
+    private CompletableFuture<String> callApi(
+            String url,
+            String apiKey,
+            JsonObject body,
+            String requestApiType,
+            boolean openCodeGoProvider) {
         url = normalizeApiUrl(url, requestApiType, openCodeGoProvider);
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Content-Type", "application/json");
+        HttpRequest.Builder requestBuilder =
+                HttpRequest.newBuilder().uri(URI.create(url)).header("Content-Type", "application/json");
 
         if (API_TYPE_ANTHROPIC.equals(requestApiType)) {
             requestBuilder.header("x-api-key", apiKey);
@@ -169,17 +198,19 @@ public class AiService {
             requestBuilder.header("Authorization", "Bearer " + apiKey);
         }
 
-        HttpRequest request = requestBuilder
-                .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(body)))
-                .build();
+        HttpRequest request =
+                requestBuilder.POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(body))).build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() >= 400) {
-                        throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
-                    }
-                    return response.body();
-                });
+        return httpClient
+                .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(
+                        response -> {
+                            if (response.statusCode() >= 400) {
+                                throw new RuntimeException(
+                                        "HTTP " + response.statusCode() + ": " + response.body());
+                            }
+                            return response.body();
+                        });
     }
 
     private GenerateResult parseGenerateResponse(String responseBody, String apiType) {
@@ -195,17 +226,21 @@ public class AiService {
         }
     }
 
-    private String parseAnswerResponse(String responseBody, String apiType) {
+    private GameRoom.AnswerType parseAnswerResponse(String responseBody, String apiType) {
         try {
             String content = extractContent(responseBody, apiType).trim();
-            if (content.contains("不是") || content.contains("否")) {
-                return "§c不是";
-            } else if (content.contains("无关") || content.contains("不相关")) {
-                return "§7与此无关";
-            } else if (content.contains("是")) {
-                return "§a是";
+            String normalized = content.toLowerCase(Locale.ROOT).replaceAll("[\\s\\p{Punct}§]+", "");
+            if (normalized.contains("irrelevant")
+                    || normalized.contains("unrelated")
+                    || content.contains("无关")
+                    || content.contains("不相关")) {
+                return GameRoom.AnswerType.IRRELEVANT;
+            } else if (normalized.contains("no") || content.contains("不是") || content.contains("否")) {
+                return GameRoom.AnswerType.NO;
+            } else if (normalized.contains("yes") || content.contains("是")) {
+                return GameRoom.AnswerType.YES;
             }
-            return "§7与此无关";
+            return GameRoom.AnswerType.IRRELEVANT;
         } catch (Exception e) {
             throw new RuntimeException("解析回答失败: " + e.getMessage(), e);
         }
@@ -223,10 +258,13 @@ public class AiService {
             }
             throw new RuntimeException("No text content in response");
         } else {
-            return response.getAsJsonArray("choices")
-                    .get(0).getAsJsonObject()
+            return response
+                    .getAsJsonArray("choices")
+                    .get(0)
+                    .getAsJsonObject()
                     .getAsJsonObject("message")
-                    .get("content").getAsString();
+                    .get("content")
+                    .getAsString();
         }
     }
 
@@ -248,7 +286,8 @@ public class AiService {
         return model;
     }
 
-    private String resolveRequestApiType(String apiType, String model, String url, boolean openCodeGoProvider) {
+    private String resolveRequestApiType(
+            String apiType, String model, String url, boolean openCodeGoProvider) {
         if (isMessagesEndpoint(url)) return API_TYPE_ANTHROPIC;
         if (isChatCompletionsEndpoint(url)) return API_TYPE_OPENAI;
         if (openCodeGoProvider) {
@@ -344,18 +383,13 @@ public class AiService {
         return provider;
     }
 
+    @Getter
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static class GenerateResult {
         private final boolean success;
         private final String title;
         private final String truth;
         private final String error;
-
-        private GenerateResult(boolean success, String title, String truth, String error) {
-            this.success = success;
-            this.title = title;
-            this.truth = truth;
-            this.error = error;
-        }
 
         public static GenerateResult success(String title, String truth) {
             return new GenerateResult(true, title, truth, null);
@@ -364,10 +398,5 @@ public class AiService {
         public static GenerateResult fail(String error) {
             return new GenerateResult(false, null, null, error);
         }
-
-        public boolean isSuccess() { return success; }
-        public String getTitle() { return title; }
-        public String getTruth() { return truth; }
-        public String getError() { return error; }
     }
 }

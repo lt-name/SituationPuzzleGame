@@ -1,8 +1,9 @@
 package cn.lanink.situationpuzzlegame.config;
 
 import cn.lanink.situationpuzzlegame.SituationPuzzleGame;
+import cn.lanink.situationpuzzlegame.i18n.Texts;
+import cn.nukkit.lang.LangCode;
 import cn.nukkit.utils.ConfigSection;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,8 +34,7 @@ public class PluginConfig {
                 plugin.getConfig().getString(basePath + ".api-key", ""),
                 plugin.getConfig().getString(basePath + ".model", "deepseek-v4-pro"),
                 plugin.getConfig().getString(basePath + ".thinking-type", "disabled"),
-                plugin.getConfig().getString(basePath + ".reasoning-effort", "high")
-        );
+                plugin.getConfig().getString(basePath + ".reasoning-effort", "high"));
     }
 
     public AiProviderConfig getGeneratorProvider() {
@@ -54,8 +54,12 @@ public class PluginConfig {
     }
 
     // Generator
-    public String getGeneratorSystemPrompt() {
-        return plugin.getConfig().getString("generator.system-prompt", "");
+    public String getGeneratorSystemPrompt(LangCode lang) {
+        return prompt(lang, "ai.generator.system-prompt");
+    }
+
+    public String getGeneratorUserPrompt(LangCode lang) {
+        return prompt(lang, "ai.generator.user-prompt");
     }
 
     public boolean isGeneratorEnabled() {
@@ -74,6 +78,18 @@ public class PluginConfig {
         return plugin.getConfig().getString("generator.difficulties." + key + ".name", key);
     }
 
+    public String getDifficultyName(String key, LangCode lang) {
+        String configured =
+                plugin
+                        .getConfig()
+                        .getString("generator.difficulties." + key + ".name-" + lang.name(), null);
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        String translated = Texts.t(plugin, lang, "difficulty." + key + ".name");
+        return translated.equals("difficulty." + key + ".name") ? getDifficultyName(key) : translated;
+    }
+
     public String getDifficultyStars(String key) {
         return plugin.getConfig().getString("generator.difficulties." + key + ".stars", "");
     }
@@ -82,13 +98,31 @@ public class PluginConfig {
         return plugin.getConfig().getString("generator.difficulties." + key + ".description", "");
     }
 
-    public String getDifficultyPrompt(String key) {
-        return plugin.getConfig().getString("generator.difficulties." + key + ".prompt", "");
+    public String getDifficultyDescription(String key, LangCode lang) {
+        String configured =
+                plugin
+                        .getConfig()
+                        .getString("generator.difficulties." + key + ".description-" + lang.name(), null);
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        String translated = Texts.t(plugin, lang, "difficulty." + key + ".description");
+        return translated.equals("difficulty." + key + ".description")
+                ? getDifficultyDescription(key)
+                : translated;
+    }
+
+    public String getDifficultyPrompt(String key, LangCode lang) {
+        return prompt(lang, "ai.generator.difficulty." + key + ".prompt");
     }
 
     // Answerer
-    public String getAnswererSystemPrompt() {
-        return plugin.getConfig().getString("answerer.system-prompt", "");
+    public String getAnswererSystemPrompt(LangCode lang) {
+        return prompt(lang, "ai.answerer.system-prompt");
+    }
+
+    public String getAnswererUserPrompt(LangCode lang, String truth, String question) {
+        return prompt(lang, "ai.answerer.user-prompt", truth, question);
     }
 
     public boolean isAnswererEnabled() {
@@ -120,5 +154,20 @@ public class PluginConfig {
 
     public int getCacheMaxPerDifficulty() {
         return plugin.getConfig().getInt("cache.max-per-difficulty", 20);
+    }
+
+    private String prompt(LangCode lang, String key, Object... args) {
+        String translated = Texts.t(plugin, lang, key, args);
+        if (!translated.equals(key)) {
+            return translated;
+        }
+        LangCode normalized = Texts.normalize(lang);
+        if (normalized != LangCode.zh_CN) {
+            translated = Texts.t(plugin, LangCode.zh_CN, key, args);
+            if (!translated.equals(key)) {
+                return translated;
+            }
+        }
+        throw new IllegalStateException("缺少语言文件提示词: " + key);
     }
 }

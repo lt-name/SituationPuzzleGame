@@ -1,32 +1,40 @@
 package cn.lanink.situationpuzzlegame;
 
-import cn.nukkit.Player;
-import cn.nukkit.ddui.DataDrivenScreen;
-import cn.nukkit.event.EventHandler;
-import cn.nukkit.event.Listener;
-import cn.nukkit.event.player.PlayerQuitEvent;
-import cn.nukkit.plugin.PluginBase;
 import cn.lanink.situationpuzzlegame.ai.AiService;
 import cn.lanink.situationpuzzlegame.cache.PuzzleCache;
 import cn.lanink.situationpuzzlegame.command.MainCommand;
 import cn.lanink.situationpuzzlegame.config.PluginConfig;
 import cn.lanink.situationpuzzlegame.game.GameRoom;
 import cn.lanink.situationpuzzlegame.game.GameState;
+import cn.lanink.situationpuzzlegame.i18n.Texts;
 import cn.lanink.situationpuzzlegame.stats.StatsManager;
-
+import cn.nukkit.Player;
+import cn.nukkit.ddui.DataDrivenScreen;
+import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.Listener;
+import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.lang.LangCode;
+import cn.nukkit.lang.PluginI18n;
+import cn.nukkit.lang.PluginI18nManager;
+import cn.nukkit.plugin.PluginBase;
 import java.util.*;
+import lombok.Getter;
 
 public class SituationPuzzleGame extends PluginBase implements Listener {
 
     private final Map<String, GameRoom> rooms = new LinkedHashMap<>();
     private final Map<Player, GameRoom> playerRooms = new LinkedHashMap<>();
-    private PluginConfig pluginConfig;
-    private AiService aiService;
-    private PuzzleCache puzzleCache;
-    private StatsManager statsManager;
+    @Getter private PluginConfig pluginConfig;
+    @Getter private AiService aiService;
+    @Getter private PuzzleCache puzzleCache;
+    @Getter private StatsManager statsManager;
+    @Getter private PluginI18n i18n;
 
     @Override
     public void onEnable() {
+        i18n = PluginI18nManager.register(this);
+        i18n.setFallbackLanguage(LangCode.zh_CN);
+        Texts.bind(i18n);
         pluginConfig = new PluginConfig(this);
         aiService = new AiService(pluginConfig);
         puzzleCache = new PuzzleCache(this);
@@ -37,7 +45,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
 
         getServer().getCommandMap().register("SituationPuzzleGame", new MainCommand(this));
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("SituationPuzzleGame 插件已启用！");
+        getLogger().info(Texts.t(this, cn.nukkit.lang.LangCode.zh_CN, "log.plugin.enabled"));
     }
 
     @Override
@@ -51,7 +59,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         if (statsManager != null) {
             statsManager.save();
         }
-        getLogger().info("SituationPuzzleGame 插件已卸载！");
+        getLogger().info(Texts.t(this, cn.nukkit.lang.LangCode.zh_CN, "log.plugin.disabled"));
     }
 
     @EventHandler
@@ -70,6 +78,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
     public GameRoom createRoom(Player host, String puzzleTitle, String puzzleTruth) {
         if (playerRooms.containsKey(host)) return null;
         GameRoom room = new GameRoom(host.getName(), host, puzzleTitle, puzzleTruth);
+        room.setLanguageCode(Texts.lang(host));
         rooms.put(room.getRoomId(), room);
         playerRooms.put(host, room);
         if (pluginConfig.isStatsEnabled()) {
@@ -81,7 +90,9 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
 
     public GameRoom createSinglePlayerRoom(Player player, String puzzleTitle, String puzzleTruth) {
         if (playerRooms.containsKey(player)) return null;
-        GameRoom room = new GameRoom(player.getName() + "-solo", player, puzzleTitle, puzzleTruth, true);
+        GameRoom room =
+                new GameRoom(player.getName() + "-solo", player, puzzleTitle, puzzleTruth, true);
+        room.setLanguageCode(Texts.lang(player));
         rooms.put(room.getRoomId(), room);
         playerRooms.put(player, room);
         room.startGame();
@@ -104,14 +115,16 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
     public void leaveRoom(Player player) {
         GameRoom room = playerRooms.remove(player);
         if (room == null) return;
-        if (pluginConfig.isStatsEnabled() && room.getState() == GameState.PLAYING && !room.isSinglePlayer()) {
+        if (pluginConfig.isStatsEnabled()
+                && room.getState() == GameState.PLAYING
+                && !room.isSinglePlayer()) {
             statsManager.getStats(player.getName()).recordMultiGameAbandoned();
             statsManager.markDirty();
         }
         room.removePlayer(player);
         for (Player p : room.getAllPlayers()) {
             if (p.isConnected()) {
-                p.sendMessage("§e" + player.getName() + " 离开了房间");
+                p.sendMessage(Texts.t(this, p, "message.player-left-room", player.getName()));
             }
         }
     }
@@ -131,7 +144,7 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
         for (Player p : new ArrayList<>(room.getAllPlayers())) {
             playerRooms.remove(p);
             if (p.isConnected()) {
-                p.sendMessage("§c房间已解散！");
+                p.sendMessage(Texts.t(this, p, "message.room-destroyed"));
                 DataDrivenScreen.removeActiveScreen(p);
             }
         }
@@ -148,15 +161,9 @@ public class SituationPuzzleGame extends PluginBase implements Listener {
                 .toList();
     }
 
-    public PluginConfig getPluginConfig() { return pluginConfig; }
-    public AiService getAiService() { return aiService; }
-    public PuzzleCache getPuzzleCache() { return puzzleCache; }
-    public StatsManager getStatsManager() { return statsManager; }
-
     public void recordQuestionAnswered(GameRoom room, GameRoom.Question question) {
         if (!pluginConfig.isStatsEnabled()) return;
-        String answer = question.getAnswer();
-        if (answer == null || !answer.startsWith("§a是")) return;
+        if (question.getAnswerType() != GameRoom.AnswerType.YES) return;
         String askerName = question.getAskerName();
         if (room.isSinglePlayer()) {
             statsManager.getStats(askerName).recordSoloHit();

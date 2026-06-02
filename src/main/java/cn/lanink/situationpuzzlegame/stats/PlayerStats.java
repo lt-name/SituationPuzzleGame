@@ -1,7 +1,11 @@
 package cn.lanink.situationpuzzlegame.stats;
 
 import cn.nukkit.utils.ConfigSection;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
+@Getter
+@RequiredArgsConstructor
 public class PlayerStats {
 
     private final String playerName;
@@ -22,10 +26,6 @@ public class PlayerStats {
     private int multiQuestionsHit;
 
     private int hostCount;
-
-    public PlayerStats(String playerName) {
-        this.playerName = playerName;
-    }
 
     public PlayerStats(String playerName, ConfigSection section) {
         this.playerName = section.getString("playerName", playerName);
@@ -161,22 +161,4 @@ public class PlayerStats {
         if (total == 0) return 0;
         return (double) (soloQuestionsHit + multiQuestionsHit) / total;
     }
-
-    // --- getter ---
-
-    public String getPlayerName() { return playerName; }
-    public long getLastActiveTime() { return lastActiveTime; }
-    public int getSoloGamesPlayed() { return soloGamesPlayed; }
-    public int getSoloGamesCompleted() { return soloGamesCompleted; }
-    public int getSoloGamesAbandoned() { return soloGamesAbandoned; }
-    public int getSoloQuestionsAsked() { return soloQuestionsAsked; }
-    public int getSoloQuestionsHit() { return soloQuestionsHit; }
-    public int getSoloCurrentStreak() { return soloCurrentStreak; }
-    public int getSoloBestStreak() { return soloBestStreak; }
-    public int getMultiGamesPlayed() { return multiGamesPlayed; }
-    public int getMultiGamesCompleted() { return multiGamesCompleted; }
-    public int getMultiGamesAbandoned() { return multiGamesAbandoned; }
-    public int getMultiQuestionsAsked() { return multiQuestionsAsked; }
-    public int getMultiQuestionsHit() { return multiQuestionsHit; }
-    public int getHostCount() { return hostCount; }
 }
